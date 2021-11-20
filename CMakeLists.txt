@@ -66,7 +66,7 @@ set_property(
     APPEND_STRING
     PROPERTY
         LINK_FLAGS
-        "-T ${CMAKE_CURRENT_BINARY_DIR}/${link_script} -e _start"
+        "-T ${CMAKE_CURRENT_BINARY_DIR}/${link_script} "
 )
 
 set_property(
