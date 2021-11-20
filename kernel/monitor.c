@@ -32,7 +32,7 @@ int stack_backtrace()
 	// Your code here.
 	u64 fp, prev_fp, prev_lr;
 
-	fp = (u64*)read_fp();
+	fp = read_fp();
 	while(fp) {
 		prev_fp = *(u64*)fp;
 		prev_lr = *((u64*)prev_fp+1);
