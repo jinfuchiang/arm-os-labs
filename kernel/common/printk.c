@@ -89,6 +89,11 @@ static int prints(char **out, const char *string, int width, int flags)
 	return pc;
 }
 
+char int2char(int i, int letbase) 
+{
+	if (i < 10)	return '0' + i;
+	return (char)letbase + i - 10;
+}
 // this function print number `i` in the base of `base` (base > 1)
 // `sign` is the flag of print signed number or unsigned number
 // `width` and `flags` mean the length of printed number at least `width`,
@@ -111,7 +116,7 @@ static int printk_write_num(char **out, long long i, int base, int sign,
 		return prints(out, print_buf, width, flags);
 	}
 
-	if (sign && base == 10 && i < 0) {
+	if (sign && i < 0) {
 		neg = 1;
 		u = -i;
 	}
@@ -119,7 +124,14 @@ static int printk_write_num(char **out, long long i, int base, int sign,
 	// store the digitals in the buffer `print_buf`:
 	// 1. the last postion of this buffer must be '\0'
 	// 2. the format is only decided by `base` and `letbase` here
-
+	s = print_buf + PRINT_BUF_LEN;
+	*--s = '\0';
+	while (print_buf <= s && u != 0) {
+		t = u % base;
+		*--s = int2char(t, letbase);
+		u /= base;
+	}
+		
 	if (neg) {
 		if (width && (flags & PAD_ZERO)) {
 			simple_outputchar(out, '-');

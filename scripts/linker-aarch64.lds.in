@@ -1,6 +1,7 @@
 #include "../boot/image.h"
+ENTRY(_start) /* -e _start*/
 
-SECTIONS
+SECTIONS    
 {
     . = TEXT_OFFSET;
     img_start = .;

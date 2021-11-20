@@ -30,6 +30,21 @@ int stack_backtrace()
 	printk("Stack backtrace:\n");
 
 	// Your code here.
+	u64 fp, prev_fp, prev_lr;
+
+	fp = (u64*)read_fp();
+	while(fp) {
+		prev_fp = *(u64*)fp;
+		prev_lr = *((u64*)prev_fp+1);
+
+		printk("LR %p FP %p Args", prev_lr,  prev_fp);
+		for(int i = 0; i < 5; ++i) {
+			printk(" %p", *((u64*)fp+2+i));
+		}
+		printk("\n");
+
+		fp = prev_fp;
+	}
 
 	return 0;
 }
