@@ -130,6 +130,11 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 	// </lab2>
 }
 
+void free_list_append(struct free_list *list, struct list_head *node) {
+	list->nr_free++;
+	list_append(node, &list->free_list);
+}
+
 /*
  * buddy_free_pages: give back the pages to buddy system
  * pool @ physical memory structure reserved in the kernel
@@ -140,7 +145,18 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 {
 	// <lab2>
+	struct page *freeing_page, *end_page;
+	int order, chunk_pages_n;
 
+	order = page->order;
+	chunk_pages_n = 1UL << (order + BUDDY_PAGE_SIZE_ORDER);
+	end_page = page + chunk_pages_n;
+
+	for (freeing_page = page; freeing_page < end_page; freeing_page++) {
+		freeing_page->allocated = 0;
+		free_list_append(&pool->free_lists[order], &freeing_page->node); 
+		merge_page(pool, freeing_page);
+	}
 	// </lab2>
 }
 
