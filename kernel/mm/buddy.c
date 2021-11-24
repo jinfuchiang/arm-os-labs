@@ -100,8 +100,19 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
 			       struct page *page)
 {
 	// <lab2>
-	struct page *split_page = NULL;
-	return split_page;
+	struct page *splitd_page = NULL, *buddy_chunk;
+	if(order == page->order) {
+		splitd_page = page;
+	} else {
+		page->order--;
+		buddy_chunk = get_buddy_chunk(pool, page);
+		buddy_chunk->order--;
+		buddy_chunk->allocated = 0;
+		free_list_append(&pool->free_lists[buddy_chunk->order], &buddy_chunk->node);
+		splitd_page = split_page(pool, order, page);
+	}
+	
+	return splitd_page;
 	// </lab2>
 }
 
@@ -116,8 +127,20 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
 struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 {
 	// <lab2>
-	struct page *page = NULL;
+	struct page *page = NULL, *available_chunk;
+	struct free_list *cur_free_list, *end_free_list;
 
+	cur_free_list = pool->free_lists + order;
+	end_free_list = pool->free_lists + BUDDY_MAX_ORDER;
+	while(cur_free_list < end_free_list && !cur_free_list->nr_free) {
+		cur_free_list++;
+	}
+	if(cur_free_list < end_free_list) {
+		available_chunk = list_entry((cur_free_list->free_list).next, struct page, node);
+		available_chunk->allocated = 1;
+		free_list_del(cur_free_list, &available_chunk->node);
+		page = split_page(pool, order, available_chunk);
+	}
 	return page;
 	// </lab2>
 }
@@ -141,7 +164,7 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 
 	order = page->order;
 	cur_free_list = &pool->free_lists[order];
-
+	if(order+1 >= BUDDY_MAX_ORDER) return NULL;
 	if(!page->allocated) {		
 		buddy_chunk = get_buddy_chunk(pool, page);
 		if(buddy_chunk && !buddy_chunk->allocated && order == buddy_chunk->order) {
@@ -152,7 +175,7 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 				// ensure page is the lower half buddy
 				tmp = page;
 				page = buddy_chunk;
-				buddy_chunk = page;
+				buddy_chunk = tmp;
 			}
 			page->order++, buddy_chunk->order++;
 			// maintain the invariant
@@ -179,7 +202,6 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 {
 	// <lab2>
-	struct page *freeing_page, *end_page;
 	int order;
 
 	order = page->order;
@@ -192,7 +214,7 @@ void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 	// 	merge_page(pool, freeing_page);
 	// }
 	page->allocated = 0;
-	free_list_append(&pool->free_lists[order], &page->node);
+	free_list_append(pool->free_lists + order, &page->node);
 	merge_page(pool, page);
 	// </lab2>
 }
