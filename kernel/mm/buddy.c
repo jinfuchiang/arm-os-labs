@@ -47,6 +47,16 @@ void init_buddy(struct phys_mem_pool *pool, struct page *start_page,
 	}
 }
 
+void free_list_append(struct free_list *list, struct list_head *node) {
+	list->nr_free++;
+	list_append(node, &list->free_list);
+}
+
+void free_list_del(struct free_list *list, struct list_head *node) {
+	list->nr_free--;
+	list_del(node);
+}
+
 static struct page *get_buddy_chunk(struct phys_mem_pool *pool,
 				    struct page *chunk)
 {
@@ -116,7 +126,8 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
  * merge_page: merge the given page with the buddy page
  * pool @ physical memory structure reserved in the kernel
  * page @ merged page (attempted)
- * 
+ * Invariant: Allocated page must not be in any free_list
+ * Invariant: Unallocated page must be in one and only one freelist
  * Hints: you can invoke the merge_page recursively until
  * there is not corresponding buddy page. get_buddy_chunk
  * is helpful in this function.
@@ -124,15 +135,38 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
 static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 {
 	// <lab2>
+	struct page *merged_page = NULL, *buddy_chunk, *tmp;
+	int order;
+	struct free_list *cur_free_list;
 
-	struct page *merge_page = NULL;
-	return merge_page;
+	order = page->order;
+	cur_free_list = &pool->free_lists[order];
+
+	if(!page->allocated) {		
+		buddy_chunk = get_buddy_chunk(pool, page);
+		if(buddy_chunk && !buddy_chunk->allocated && order == buddy_chunk->order) {
+			// ensure 2 chunks are in the same order free_list
+			free_list_del(cur_free_list, &buddy_chunk->node);
+			free_list_del(cur_free_list, &page->node);
+			if(page > buddy_chunk) {
+				// ensure page is the lower half buddy
+				tmp = page;
+				page = buddy_chunk;
+				buddy_chunk = page;
+			}
+			page->order++, buddy_chunk->order++;
+			// maintain the invariant
+			buddy_chunk->allocated = 1;
+			free_list_append(cur_free_list+1, &page->node);
+			// the order of page is up, so maybe page is still mergeable
+			merged_page = merge_page(pool, page);
+			if(!merged_page) {
+				merged_page = page;
+			}
+		}
+	}
+	return merged_page;
 	// </lab2>
-}
-
-void free_list_append(struct free_list *list, struct list_head *node) {
-	list->nr_free++;
-	list_append(node, &list->free_list);
 }
 
 /*
@@ -146,17 +180,20 @@ void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 {
 	// <lab2>
 	struct page *freeing_page, *end_page;
-	int order, chunk_pages_n;
+	int order;
 
 	order = page->order;
-	chunk_pages_n = 1UL << (order + BUDDY_PAGE_SIZE_ORDER);
-	end_page = page + chunk_pages_n;
+	// chunk_pages_n = 1UL << order;
+	// end_page = page + chunk_pages_n;
 
-	for (freeing_page = page; freeing_page < end_page; freeing_page++) {
-		freeing_page->allocated = 0;
-		free_list_append(&pool->free_lists[order], &freeing_page->node); 
-		merge_page(pool, freeing_page);
-	}
+	// for (freeing_page = page; freeing_page < end_page; freeing_page++) {
+	// 	freeing_page->allocated = 0;
+	// 	free_list_append(&pool->free_lists[order], &freeing_page->node); 
+	// 	merge_page(pool, freeing_page);
+	// }
+	page->allocated = 0;
+	free_list_append(&pool->free_lists[order], &page->node);
+	merge_page(pool, page);
 	// </lab2>
 }
 
