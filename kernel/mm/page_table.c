@@ -176,7 +176,9 @@ int walk(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry, bool alloc) 
 int query_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry)
 {
 	// <lab2>
-	return walk(pgtbl, va, pa, entry, 0);
+	int status = walk(pgtbl, va, pa, entry, 0);
+	if(status == -ENOMAPPING) return -ENOMAPPING;
+	return 0;
 	// </lab2>
 }
 
@@ -209,7 +211,10 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 		(pte->l3_page).is_page = 1;
 		(pte->l3_page).pfn =  pa >> PAGE_SHIFT;
 		set_pte_flags(pte, flags, KERNEL_PTE);
-		len -= PAGE_SIZE;	
+		len -= PAGE_SIZE;
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+
 	}
 	flush_tlb();
 	// </lab2>
