@@ -114,7 +114,7 @@ static int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
 	if (IS_PTE_INVALID(entry->pte)) {
 		if (alloc == false) {
 			return -ENOMAPPING;
-		} else {
+		} else if (level != 3){
 			/* alloc a new page table page */
 			ptp_t *new_ptp;
 			paddr_t new_ptp_paddr;
@@ -144,6 +144,20 @@ static int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
 		return BLOCK_PTP;
 }
 
+int walk(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry, bool alloc) {
+	ptp_t *next_ptp;
+	pte_t *pte;
+	int status;
+	for(int level = 0; level < 4; ++level) {
+		status = get_next_ptp((ptp_t*)pgtbl, level, va, &next_ptp, &pte, alloc);
+		if(status == -ENOMAPPING) return -ENOMAPPING;
+		pgtbl = (vaddr_t *)next_ptp;
+	}
+	*pa = virt_to_phys(next_ptp);
+	*entry = pte;
+	return status;
+}
+
 /*
  * Translate a va to pa, and get its pte for the flags
  */
@@ -162,9 +176,8 @@ static int get_next_ptp(ptp_t * cur_ptp, u32 level, vaddr_t va,
 int query_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t * pa, pte_t ** entry)
 {
 	// <lab2>
-
+	return walk(pgtbl, va, pa, entry, 0);
 	// </lab2>
-	return 0;
 }
 
 /*
@@ -186,7 +199,19 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 		       size_t len, vmr_prop_t flags)
 {
 	// <lab2>
-
+	paddr_t a;
+	pte_t *pte;
+	len = (len+PAGE_MASK) & (~PAGE_MASK);
+	while(len) {
+		walk(pgtbl, va, &a, &pte, 1);
+		pte->pte = 0;
+		(pte->l3_page).is_valid = 1;
+		(pte->l3_page).is_page = 1;
+		(pte->l3_page).pfn =  pa >> PAGE_SHIFT;
+		set_pte_flags(pte, flags, KERNEL_PTE);
+		len -= PAGE_SIZE;	
+	}
+	flush_tlb();
 	// </lab2>
 	return 0;
 }
@@ -207,7 +232,15 @@ int map_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, paddr_t pa,
 int unmap_range_in_pgtbl(vaddr_t * pgtbl, vaddr_t va, size_t len)
 {
 	// <lab2>
-
+	paddr_t pa;
+	pte_t *pte;
+	len = (len+PAGE_MASK) & (~PAGE_MASK);
+	while(len) {
+		query_in_pgtbl(pgtbl, va, &pa, &pte);
+		pte->pte = 0;
+		len -= PAGE_SIZE;
+	}
+	flush_tlb();
 	// </lab2>
 	return 0;
 }
